@@ -38,6 +38,7 @@ local backgroundRect = { 0, 0, 0, 0 }
 local delayedSetup = false
 local sec = 0
 local sec2 = 0
+local lastRot = -1 --TODO: switch this to use MiniMapRotationChanged Callin when it is added to Engine
 
 local spGetCameraState = Spring.GetCameraState
 local spGetActiveCommand = Spring.GetActiveCommand
@@ -70,7 +71,7 @@ end
 local function clear()
 	dlistMinimap = gl.DeleteList(dlistMinimap)
 	if uiBgTex then
-		gl.DeleteTextureFBO(uiBgTex)
+		gl.DeleteTexture(uiBgTex)
 		uiBgTex = nil
 	end
 	if WG['guishader'] and dlistGuishader then
@@ -122,7 +123,7 @@ function widget:ViewResize()
 	end
 	dlistMinimap = gl.DeleteList(dlistMinimap)
 	if uiBgTex then
-		gl.DeleteTextureFBO(uiBgTex)
+		gl.DeleteTexture(uiBgTex)
 		uiBgTex = nil
 	end
 end
@@ -178,6 +179,17 @@ function widget:Shutdown()
 end
 
 function widget:Update(dt)
+	local currRot = getCurrentMiniMapRotationOption()
+	if lastRot ~= currRot then
+		if currRot == ROTATION.DEG_90 or currRot == ROTATION.DEG_270 then
+			ratio = Game.mapY / Game.mapX
+		else
+			ratio = Game.mapX / Game.mapY
+		end
+		lastRot = currRot
+		widget:ViewResize()
+		return
+	end
 	if not delayedSetup then
 		sec = sec + dt
 		if sec > 2 then
@@ -213,7 +225,7 @@ end
 
 
 local function drawBackground()
-	UiElement(backgroundRect[1], backgroundRect[2], backgroundRect[3], backgroundRect[4], 0, 0, 1, 0, nil, nil, nil, nil, nil, nil, nil, nil, useRenderToTexture)
+	UiElement(backgroundRect[1], backgroundRect[2], backgroundRect[3], backgroundRect[4], 0, 0, 1, 0, nil, nil, nil, nil, nil, nil, nil, nil)
 end
 
 local st = spGetCameraState()
@@ -266,21 +278,19 @@ function widget:DrawScreen()
 					format = GL.RGBA,
 					fbo = true,
 				})
-				gl.RenderToTexture(uiBgTex, function()
-					gl.Clear(GL.COLOR_BUFFER_BIT, 0, 0, 0, 0)
-					gl.PushMatrix()
-					gl.Translate(-1, -1, 0)
-					gl.Scale(2 / (backgroundRect[3]-backgroundRect[1]), 2 / (backgroundRect[4]-backgroundRect[2]),	0)
-					gl.Translate(-backgroundRect[1], -backgroundRect[2], 0)
-					drawBackground()
-					gl.PopMatrix()
-				end)
+				gl.R2tHelper.RenderToTexture(uiBgTex,
+					function()
+						gl.Translate(-1, -1, 0)
+						gl.Scale(2 / (backgroundRect[3]-backgroundRect[1]), 2 / (backgroundRect[4]-backgroundRect[2]),	0)
+						gl.Translate(-backgroundRect[1], -backgroundRect[2], 0)
+						drawBackground()
+					end,
+					useRenderToTexture
+				)
 			end
 			if uiBgTex then
 				-- background element
-				gl.Color(1,1,1,Spring.GetConfigFloat("ui_opacity", 0.7)*1.1)
-				gl.Texture(uiBgTex)
-				gl.TexRect(backgroundRect[1], backgroundRect[2], backgroundRect[3], backgroundRect[4], false, true)
+				gl.R2tHelper.BlendTexRect(uiBgTex, backgroundRect[1], backgroundRect[2], backgroundRect[3], backgroundRect[4], useRenderToTexture)
 			end
 		else
 			if not dlistMinimap then

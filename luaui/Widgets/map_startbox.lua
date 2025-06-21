@@ -64,10 +64,13 @@ local amPlaced = false
 local gaiaTeamID
 
 local startTimer = Spring.GetTimer()
+local lastRot = -1 --TODO: switch this to use MiniMapRotationChanged Callin when it is added to Engine
 
 local infotextList
 
 local GetTeamColor = Spring.GetTeamColor
+
+local ColorIsDark = Spring.Utilities.Color.ColorIsDark
 
 local glTranslate = gl.Translate
 local glCallList = gl.CallList
@@ -100,7 +103,7 @@ local function createCommanderNameList(x, y, name, teamID)
 	commanderNameList[teamID]['list'] = gl.CreateList(function()
 		local r, g, b = GetTeamColor(teamID)
 		local outlineColor = { 0, 0, 0, 1 }
-		if (r + g * 1.2 + b * 0.4) < 0.65 then
+		if ColorIsDark(r, g, b) then
 			outlineColor = { 1, 1, 1, 1 }
 		end
 		if useThickLeterring then
@@ -587,6 +590,12 @@ end
 
 local sec = 0
 function widget:Update(delta)
+	local currRot = getCurrentMiniMapRotationOption()
+	if lastRot ~= currRot then
+		lastRot = currRot
+		widget:ViewResize(vsx, vsy)
+		return
+	end
 	if Spring.GetGameFrame() > 1 then
 		widgetHandler:RemoveWidget()
 	end
